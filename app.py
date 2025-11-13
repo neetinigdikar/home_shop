@@ -47,15 +47,13 @@ def admin_page():
     if st.button("Logout"):
         st.session_state.clear()
         st.session_state["page"] = "login"
-        st.experimental_rerun()
+        st.session_state["navigate"] = True   # FIX: safe navigation
 
 
 # ---------------------------------------------------
 # USER LOGIN PAGE
 # ---------------------------------------------------
 def user_login_page():
-    st.title("👤 User Login")
-
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
@@ -64,14 +62,15 @@ def user_login_page():
         if user:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
+            st.session_state["is_admin"] = False
             st.session_state["page"] = "user"
-            st.session_state["navigate"] = True
+            st.session_state["navigate"] = True  # safe navigation
         else:
             st.error("❌ Invalid username or password")
 
 
 # ---------------------------------------------------
-# USER PAGE
+# USER SHOPPING PAGE
 # ---------------------------------------------------
 def user_page():
     st.title(f"👤 Welcome, {st.session_state['username']}")
@@ -112,14 +111,13 @@ def user_page():
 
                 st.success("Order placed!")
                 st.session_state["cart"] = {}
-
     else:
         st.info("🛍️ Cart is empty.")
 
     if st.button("Logout"):
         st.session_state.clear()
         st.session_state["page"] = "login"
-        st.experimental_rerun()
+        st.session_state["navigate"] = True   # safe navigation
 
 
 # ---------------------------------------------------
@@ -130,7 +128,7 @@ def login_selection_page():
 
     choice = st.radio("Login as:", ["User", "Admin"])
 
-    # ---------------------- ADMIN LOGIN -------------------------
+    # Admin Login
     if choice == "Admin":
         admin_user = st.text_input("Admin Username")
         admin_pass = st.text_input("Admin Password", type="password")
@@ -140,11 +138,11 @@ def login_selection_page():
                 st.session_state["logged_in"] = True
                 st.session_state["is_admin"] = True
                 st.session_state["page"] = "admin"
-                st.session_state["navigate"] = True   # <-- Trigger navigation
+                st.session_state["navigate"] = True  # safe navigation
             else:
                 st.error("❌ Invalid admin credentials")
 
-    # ---------------------- USER LOGIN --------------------------
+    # User Login
     else:
         user_login_page()
 
@@ -154,7 +152,7 @@ def login_selection_page():
 # ---------------------------------------------------
 def main():
 
-    # Trigger safe rerun when needed
+    # 🔄 SAFE NAVIGATION HANDLER
     if st.session_state.get("navigate"):
         st.session_state["navigate"] = False
         st.experimental_rerun()
@@ -163,11 +161,14 @@ def main():
 
     if page == "login":
         login_selection_page()
+
     elif page == "admin":
         admin_page()
+
     elif page == "user":
         user_page()
 
 
 if __name__ == "__main__":
     main()
+s
