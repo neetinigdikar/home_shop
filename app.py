@@ -25,12 +25,13 @@ ADMIN_PASSWORD = "admin123"
 def admin_page():
     st.title("👩‍💼 Admin Dashboard")
 
+    st.subheader("➕ Create New User")
     new_username = st.text_input("New Username")
     new_password = st.text_input("New Password", type="password")
 
     if st.button("Create User"):
         if users_col.find_one({"username": new_username}):
-            st.error("Username already exists!")
+            st.error("⚠️ Username already exists!")
         else:
             users_col.insert_one({"username": new_username, "password": new_password})
             st.success("User created successfully!")
@@ -45,116 +46,66 @@ def admin_page():
 
 
 # ---------------------------------------------------
-# User Login
+# USER: Product Display + Add to Cart
 # ---------------------------------------------------
-def user_login_page():
-    st.title("User Login")
+def products_page():
+    st.title("🛍 Products")
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    products = list(products_col.find())
 
-    if st.button("Login"):
-        user = users_col.find_one({"username": username, "password": password})
-        if user:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = username
-            st.session_state["page"] = "user"
-        else:
-            st.error("Invalid username or password")
+    if not products:
+        st.info("No products found in database.")
+        return
+
+    for product in products:
+        st.write("---")
+        st.write(f"### {product['name']}")
+        st.write(f"Price: ₹{product['price']}")
+        st.write(f"Stock: {product['stock']}")
+
+        qty = st.number_input(f"Quantity for {product['id']}", min_value=1, max_value=product['stock'], key=f"qty_{product['id']}")
+
+        if st.button(f"Add to Cart: {product['id']}"):
+            cart = st.session_state.get("cart", {})
+
+            if product["id"] in cart:
+                cart[product["id"]]["qty"] += int(qty)
+            else:
+                cart[product["id"]] = {
+                    "name": product["name"],
+                    "price": product["price"],
+                    "qty": int(qty)
+                }
+
+            st.session_state["cart"] = cart
+            st.success(f"Added {qty} × {product['name']} to cart!")
+
+
+    if st.button("Go to Cart"):
+        st.session_state["page"] = "user_cart"
 
 
 # ---------------------------------------------------
 # User Cart Page
 # ---------------------------------------------------
-def user_page():
-    st.title(f"Welcome, {st.session_state['username']}")
+def user_cart_page():
+    st.title("🛒 Your Cart")
 
     cart = st.session_state.get("cart", {})
-    st.subheader("Your Cart")
 
-    if cart:
-        total = 0
+    if not cart:
+        st.info("Your cart is empty.")
+        return
+
+    total = 0
+    for pid, item in cart.items():
+        line_total = item["price"] * item["qty"]
+        st.write(f"{item['name']} — ₹{item['price']} × {item['qty']} = ₹{line_total}")
+        total += line_total
+
+    st.write(f"### Total: ₹{total}")
+
+    if st.button("Buy Now"):
+        out_of_stock = []
 
         for pid, item in cart.items():
-            st.write(
-                f"{item['name']} — ₹{item['price']} × {item['qty']} = ₹{item['price'] * item['qty']}"
-            )
-            total += item["price"] * item["qty"]
-
-        st.write(f"### Total: ₹{total}")
-
-        if st.button("Buy Now"):
-            out_of_stock = []
-            for pid, item in cart.items():
-                product = products_col.find_one({"id": pid})
-                if not product or product["stock"] < item["qty"]:
-                    out_of_stock.append(item["name"])
-
-            if out_of_stock:
-                st.error("Out of stock: " + ", ".join(out_of_stock))
-            else:
-                orders_col.insert_one({
-                    "user": st.session_state["username"],
-                    "items": [{"product_id": pid, **item} for pid, item in cart.items()],
-                    "total": total,
-                    "created_at": datetime.utcnow()
-                })
-
-                for pid, item in cart.items():
-                    products_col.update_one(
-                        {"id": pid},
-                        {"$inc": {"stock": -item["qty"]}}
-                    )
-
-                st.success("Order placed!")
-                st.session_state["cart"] = {}
-
-    else:
-        st.info("Your cart is empty.")
-
-    if st.button("Logout"):
-        st.session_state.clear()
-        st.session_state["page"] = "login"
-
-
-# ---------------------------------------------------
-# Login Selection Page
-# ---------------------------------------------------
-def login_selection_page():
-    st.title("Login Portal")
-
-    login_type = st.radio("Login as:", ["User", "Admin"])
-
-    if login_type == "Admin":
-        admin_user = st.text_input("Admin Username")
-        admin_pass = st.text_input("Admin Password", type="password")
-
-        if st.button("Admin Login"):
-            if admin_user == ADMIN_USERNAME and admin_pass == ADMIN_PASSWORD:
-                st.session_state["logged_in"] = True
-                st.session_state["is_admin"] = True
-                st.session_state["page"] = "admin"
-            else:
-                st.error("Invalid admin credentials")
-    else:
-        user_login_page()
-
-
-# ---------------------------------------------------
-# MAIN ROUTER (NO RERUN)
-# ---------------------------------------------------
-def main():
-    page = st.session_state.get("page", "login")
-
-    if page == "login":
-        login_selection_page()
-
-    elif page == "admin":
-        admin_page()
-
-    elif page == "user":
-        user_page()
-
-
-if __name__ == "__main__":
-    main()
