@@ -3,7 +3,7 @@ from pymongo import MongoClient
 from datetime import datetime
 
 # ---------------------------------------------------
-# MongoDB Connection (URI stored in secrets.toml)
+# MongoDB Connection
 # ---------------------------------------------------
 MONGO_URI = st.secrets["MONGO"]["MONGO_URI"]
 client = MongoClient(MONGO_URI)
@@ -14,13 +14,13 @@ products_col = db["products"]
 orders_col = db["orders"]
 
 # ---------------------------------------------------
-# ADMIN LOGIN (Hardcoded)
+# Admin Credentials
 # ---------------------------------------------------
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
 
 # ---------------------------------------------------
-# ADMIN DASHBOARD
+# Admin Page
 # ---------------------------------------------------
 def admin_page():
     st.title("👩‍💼 Admin Dashboard")
@@ -39,7 +39,7 @@ def admin_page():
             })
             st.success("✅ User created successfully!")
 
-    st.subheader("👥 All Users")
+    st.subheader("👥 Registered Users")
     for user in users_col.find():
         st.write(f"• {user['username']}")
 
@@ -50,7 +50,7 @@ def admin_page():
 
 
 # ---------------------------------------------------
-# USER LOGIN PAGE
+# User Login Page
 # ---------------------------------------------------
 def user_login_page():
     st.title("👤 User Login")
@@ -64,7 +64,6 @@ def user_login_page():
         if user:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
-            st.session_state["is_admin"] = False
             st.session_state["page"] = "user"
             st.session_state["navigate"] = True
         else:
@@ -72,7 +71,7 @@ def user_login_page():
 
 
 # ---------------------------------------------------
-# USER DASHBOARD
+# User Dashboard
 # ---------------------------------------------------
 def user_page():
     st.title(f"👤 Welcome, {st.session_state['username']}")
@@ -83,5 +82,4 @@ def user_page():
     if cart:
         total = 0
 
-        for pid, item in cart.items():
-            st.write(f"{item['name']} — ₹{item['price']} × {item['qty']} = ₹{item[']()
+        for pid, i
