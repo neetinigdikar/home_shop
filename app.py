@@ -1,21 +1,21 @@
 import streamlit as st
 from pymongo import MongoClient
-from bson import ObjectId
+from bson.objectid import ObjectId
 from datetime import datetime
 
 # ---------------------------------------------------
-# DATABASE CONNECTION (SECURE)
+# MongoDB Connection (secure via secrets)
 # ---------------------------------------------------
 MONGO_URI = st.secrets["MONGO"]["MONGO_URI"]
 client = MongoClient(MONGO_URI)
 db = client["home_shop_db"]
 
-users_col = db["users"]          # stores all users created by admin
-products_col = db["products"]    # your products collection
-orders_col = db["orders"]        # order collection
+users_col = db["users"]
+products_col = db["products"]
+orders_col = db["orders"]
 
 # ---------------------------------------------------
-# ADMIN LOGIN (HARDCODED)
+# ADMIN CREDENTIALS (HARDCODED)
 # ---------------------------------------------------
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
@@ -28,30 +28,27 @@ def admin_page():
     st.title("👩‍💼 Admin Dashboard")
 
     st.subheader("➕ Create New User")
-
-    new_username = st.text_input("Enter new username")
-    new_password = st.text_input("Enter new password", type="password")
+    new_username = st.text_input("New Username")
+    new_password = st.text_input("New Password", type="password")
 
     if st.button("Create User"):
         if users_col.find_one({"username": new_username}):
             st.error("⚠️ Username already exists!")
         else:
-            users_col.insert_one({
-                "username": new_username,
-                "password": new_password
-            })
+            users_col.insert_one({"username": new_username, "password": new_password})
             st.success("✅ User created successfully!")
 
-    st.subheader("👥 All Registered Users")
-
+    st.subheader("👥 Registered Users")
     users = list(users_col.find())
-    for user in users:
-        st.write(f"• {user['username']}")
+    if users:
+        for u in users:
+            st.write(f"• {u['username']}")
+    else:
+        st.info("No users created yet.")
 
     if st.button("Logout"):
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        st.experimental_rerun()
+        st.session_state.clear()
+        st.session_state["page"] = "login"
 
 
 # ---------------------------------------------------
@@ -63,22 +60,21 @@ def user_login_page():
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
-    if st.button("Login"):
+    if st.button("User Login"):
         user = users_col.find_one({"username": username, "password": password})
-
         if user:
             st.session_state["logged_in"] = True
-            st.session_state["username"] = user["username"]
+            st.session_state["username"] = username
             st.session_state["user_id"] = str(user["_id"])
             st.session_state["is_admin"] = False
-            st.success("✅ User login successful!")
-            st.experimental_rerun()
+            st.session_state["page"] = "user"
+            st.success("✅ Login successful!")
         else:
             st.error("❌ Invalid username or password")
 
 
 # ---------------------------------------------------
-# SHOPPING CART PAGE FOR USERS
+# USER SHOPPING PAGE
 # ---------------------------------------------------
 def user_page():
     st.title(f"👤 Welcome, {st.session_state['username']}")
@@ -86,34 +82,32 @@ def user_page():
     cart = st.session_state.get("cart", {})
 
     st.subheader("🛒 Your Cart")
+
     if cart:
-        total = 0.0
+        total = 0
         for pid, item in cart.items():
             st.write(f"{item['name']} — ₹{item['price']} × {item['qty']} = ₹{item['price'] * item['qty']}")
             total += item["price"] * item["qty"]
 
-        st.write(f"### 💰 Total: ₹{total}")
+        st.write(f"### Total: ₹{total}")
 
         if st.button("Buy Now"):
             out_of_stock = []
 
             for pid, item in cart.items():
-                prod = products_col.find_one({"_id": ObjectId(pid)})
-                if not prod or prod.get("stock", 0) < item["qty"]:
+                product = products_col.find_one({"_id": ObjectId(pid)})
+                if not product or product.get("stock", 0) < item["qty"]:
                     out_of_stock.append(item["name"])
 
             if out_of_stock:
-                st.error(f"❌ Out of stock: {', '.join(out_of_stock)}")
+                st.error("❌ Out of stock: " + ", ".join(out_of_stock))
             else:
                 orders_col.insert_one({
                     "user": st.session_state["username"],
                     "user_id": st.session_state["user_id"],
-                    "items": [
-                        {"product_id": pid, "name": item["name"], "price": item["price"], "qty": item["qty"]}
-                        for pid, item in cart.items()
-                    ],
+                    "items": [{"product_id": pid, **item} for pid, item in cart.items()],
                     "total": total,
-                    "created_at": datetime.utcnow()
+                    "created_at": datetime.utcnow(),
                 })
 
                 for pid, item in cart.items():
@@ -124,26 +118,24 @@ def user_page():
 
                 st.success("✅ Order placed successfully!")
                 st.session_state["cart"] = {}
-                st.experimental_rerun()
+
     else:
         st.info("🛍️ Your cart is empty.")
 
     if st.button("Logout"):
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        st.experimental_rerun()
+        st.session_state.clear()
+        st.session_state["page"] = "login"
 
 
 # ---------------------------------------------------
-# LOGIN CHOICE PAGE
+# LOGIN SELECTION PAGE
 # ---------------------------------------------------
 def login_selection_page():
     st.title("🔐 Login Portal")
-    st.subheader("Choose login type:")
 
-    choice = st.radio("Login as:", ["User", "Admin"])
+    login_type = st.radio("Login as:", ["User", "Admin"])
 
-    if choice == "Admin":
+    if login_type == "Admin":
         admin_user = st.text_input("Admin Username")
         admin_pass = st.text_input("Admin Password", type="password")
 
@@ -151,8 +143,8 @@ def login_selection_page():
             if admin_user == ADMIN_USERNAME and admin_pass == ADMIN_PASSWORD:
                 st.session_state["logged_in"] = True
                 st.session_state["is_admin"] = True
+                st.session_state["page"] = "admin"
                 st.success("✅ Admin login successful!")
-                st.experimental_rerun()
             else:
                 st.error("❌ Invalid admin credentials")
 
@@ -161,17 +153,21 @@ def login_selection_page():
 
 
 # ---------------------------------------------------
-# MAIN ROUTING LOGIC
+# MAIN ROUTER
 # ---------------------------------------------------
 def main():
-    if not st.session_state.get("logged_in"):
+    page = st.session_state.get("page", "login")
+
+    if page == "login":
         login_selection_page()
-    else:
-        if st.session_state.get("is_admin"):
-            admin_page()
-        else:
-            user_page()
+    elif page == "admin":
+        admin_page()
+    elif page == "user":
+        user_page()
 
 
+# ---------------------------------------------------
+# RUN APP
+# ---------------------------------------------------
 if __name__ == "__main__":
     main()
