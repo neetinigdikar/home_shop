@@ -3,7 +3,7 @@ from pymongo import MongoClient
 from datetime import datetime
 
 # ---------------------------------------------------
-# MongoDB Connection
+# MongoDB Connection (URI stored in secrets.toml)
 # ---------------------------------------------------
 MONGO_URI = st.secrets["MONGO"]["MONGO_URI"]
 client = MongoClient(MONGO_URI)
@@ -14,14 +14,13 @@ products_col = db["products"]
 orders_col = db["orders"]
 
 # ---------------------------------------------------
-# ADMIN LOGIN (HARDCODED)
+# ADMIN LOGIN (Hardcoded)
 # ---------------------------------------------------
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
 
-
 # ---------------------------------------------------
-# ADMIN PAGE
+# ADMIN DASHBOARD
 # ---------------------------------------------------
 def admin_page():
     st.title("👩‍💼 Admin Dashboard")
@@ -47,30 +46,33 @@ def admin_page():
     if st.button("Logout"):
         st.session_state.clear()
         st.session_state["page"] = "login"
-        st.session_state["navigate"] = True   # FIX: safe navigation
+        st.session_state["navigate"] = True
 
 
 # ---------------------------------------------------
 # USER LOGIN PAGE
 # ---------------------------------------------------
 def user_login_page():
+    st.title("👤 User Login")
+
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
     if st.button("User Login"):
         user = users_col.find_one({"username": username, "password": password})
+
         if user:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
             st.session_state["is_admin"] = False
             st.session_state["page"] = "user"
-            st.session_state["navigate"] = True  # safe navigation
+            st.session_state["navigate"] = True
         else:
             st.error("❌ Invalid username or password")
 
 
 # ---------------------------------------------------
-# USER SHOPPING PAGE
+# USER DASHBOARD
 # ---------------------------------------------------
 def user_page():
     st.title(f"👤 Welcome, {st.session_state['username']}")
@@ -80,95 +82,6 @@ def user_page():
 
     if cart:
         total = 0
+
         for pid, item in cart.items():
-            st.write(f"{item['name']} — ₹{item['price']} × {item['qty']} = ₹{item['price'] * item['qty']}")
-            total += item["price"] * item["qty"]
-
-        st.write(f"### Total: ₹{total}")
-
-        if st.button("Buy Now"):
-            out_of_stock = []
-            for pid, item in cart.items():
-                product = products_col.find_one({"id": pid})
-                if not product or product["stock"] < item["qty"]:
-                    out_of_stock.append(item["name"])
-
-            if out_of_stock:
-                st.error("Out of stock: " + ", ".join(out_of_stock))
-            else:
-                orders_col.insert_one({
-                    "user": st.session_state["username"],
-                    "items": [{"product_id": pid, **item} for pid, item in cart.items()],
-                    "total": total,
-                    "created_at": datetime.utcnow()
-                })
-
-                for pid, item in cart.items():
-                    products_col.update_one(
-                        {"id": pid},
-                        {"$inc": {"stock": -item["qty"]}}
-                    )
-
-                st.success("Order placed!")
-                st.session_state["cart"] = {}
-    else:
-        st.info("🛍️ Cart is empty.")
-
-    if st.button("Logout"):
-        st.session_state.clear()
-        st.session_state["page"] = "login"
-        st.session_state["navigate"] = True   # safe navigation
-
-
-# ---------------------------------------------------
-# LOGIN SELECTION PAGE
-# ---------------------------------------------------
-def login_selection_page():
-    st.title("🔐 Login Portal")
-
-    choice = st.radio("Login as:", ["User", "Admin"])
-
-    # Admin Login
-    if choice == "Admin":
-        admin_user = st.text_input("Admin Username")
-        admin_pass = st.text_input("Admin Password", type="password")
-
-        if st.button("Admin Login"):
-            if admin_user == ADMIN_USERNAME and admin_pass == ADMIN_PASSWORD:
-                st.session_state["logged_in"] = True
-                st.session_state["is_admin"] = True
-                st.session_state["page"] = "admin"
-                st.session_state["navigate"] = True  # safe navigation
-            else:
-                st.error("❌ Invalid admin credentials")
-
-    # User Login
-    else:
-        user_login_page()
-
-
-# ---------------------------------------------------
-# MAIN ROUTER
-# ---------------------------------------------------
-def main():
-
-    # 🔄 SAFE NAVIGATION HANDLER
-    if st.session_state.get("navigate"):
-        st.session_state["navigate"] = False
-        st.experimental_rerun()
-
-    page = st.session_state.get("page", "login")
-
-    if page == "login":
-        login_selection_page()
-
-    elif page == "admin":
-        admin_page()
-
-    elif page == "user":
-        user_page()
-
-
-if __name__ == "__main__":
-    main()
-s
+            st.write(f"{item['name']} — ₹{item['price']} × {item['qty']} = ₹{item[']()
